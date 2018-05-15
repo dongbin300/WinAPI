@@ -1,0 +1,17 @@
+﻿  main.cpp
+c:\users\kyoumei\documents\visual studio 2015\projects\gitadora simulator\gitadora simulator\main.cpp(240): warning C4476: 'fscanf' : 서식 지정자에 알 수 없는 형식 필드 문자 '.'이(가) 있습니다.
+c:\users\kyoumei\documents\visual studio 2015\projects\gitadora simulator\gitadora simulator\main.cpp(240): warning C4474: 'fscanf' : 서식 문자열에 전달된 인수가 너무 많습니다.
+  c:\users\kyoumei\documents\visual studio 2015\projects\gitadora simulator\gitadora simulator\main.cpp(240): note: 자리 표시자 및 해당 매개 변수에는 variadic 인수가 0개 필요하지만 1개가 제공되었습니다.
+c:\users\kyoumei\documents\visual studio 2015\projects\gitadora simulator\gitadora simulator\main.cpp(188): warning C4101: 'inindc' :참조되지 않은 지역 변수입니다.
+c:\users\kyoumei\documents\visual studio 2015\projects\gitadora simulator\gitadora simulator\main.cpp(196): warning C4101: 'dwWritten' :참조되지 않은 지역 변수입니다.
+c:\users\kyoumei\documents\visual studio 2015\projects\gitadora simulator\gitadora simulator\main.cpp(190): warning C4101: 'obit' :참조되지 않은 지역 변수입니다.
+c:\users\kyoumei\documents\visual studio 2015\projects\gitadora simulator\gitadora simulator\main.cpp(192): warning C4101: 'totalnote_font' :참조되지 않은 지역 변수입니다.
+c:\users\kyoumei\documents\visual studio 2015\projects\gitadora simulator\gitadora simulator\main.cpp(190): warning C4101: 'bit' :참조되지 않은 지역 변수입니다.
+c:\users\kyoumei\documents\visual studio 2015\projects\gitadora simulator\gitadora simulator\main.cpp(192): warning C4101: 'acc_font' :참조되지 않은 지역 변수입니다.
+c:\users\kyoumei\documents\visual studio 2015\projects\gitadora simulator\gitadora simulator\main.cpp(196): warning C4101: 'dwRead' :참조되지 않은 지역 변수입니다.
+c:\users\kyoumei\documents\visual studio 2015\projects\gitadora simulator\gitadora simulator\main.cpp(195): warning C4101: 'rect' :참조되지 않은 지역 변수입니다.
+c:\users\kyoumei\documents\visual studio 2015\projects\gitadora simulator\gitadora simulator\main.cpp(192): warning C4101: 'acc_font2' :참조되지 않은 지역 변수입니다.
+c:\users\kyoumei\documents\visual studio 2015\projects\gitadora simulator\gitadora simulator\main.cpp(192): warning C4101: 'ofont' :참조되지 않은 지역 변수입니다.
+c:\users\kyoumei\documents\visual studio 2015\projects\gitadora simulator\gitadora simulator\main.cpp(1156): warning C4101: 'i' :참조되지 않은 지역 변수입니다.
+  GITADORA Simulator.vcxproj -> C:\Users\Kyoumei\documents\visual studio 2015\Projects\GITADORA Simulator\Debug\GITADORA Simulator.exe
+  GITADORA Simulator.vcxproj -> C:\Users\Kyoumei\documents\visual studio 2015\Projects\GITADORA Simulator\Debug\GITADORA Simulator.pdb (Full PDB)
