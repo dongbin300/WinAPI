@@ -33,9 +33,22 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance
 		NULL, (HMENU)NULL, hInstance, NULL);
 	ShowWindow(hWnd, nCmdShow);
 
-	while (GetMessage(&Message, 0, 0, 0)) {
-		TranslateMessage(&Message);
-		DispatchMessage(&Message);
+	InitSleep();
+	int done = 0;
+	while (!done)
+	{
+		// PeekMessage는 윈도우 메시지를 확인하는 논블로킹 메소드다
+		if (PeekMessage(&Message, NULL, 0, 0, PM_REMOVE))
+		{
+			// 종료 메시지를 찾는다
+			if (Message.message == WM_QUIT)
+				done = 1;
+			// 해석한 뒤 메시지를 WinProc에 전달한다
+			TranslateMessage(&Message);
+			DispatchMessage(&Message);
+		}
+		else
+			GameRunMain(hWnd);		// 게임 루프를 실행한다(반복적으로 호출)
 	}
 
 	GdiplusShutdown(tok);
