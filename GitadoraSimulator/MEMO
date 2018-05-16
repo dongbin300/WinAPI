@@ -1,0 +1,23 @@
+#GITADORA SIMULATOR
+
+100 fps.
+-> 1 frame: 0.01s
+
+bpm 60 [10] 1s [5] 0.5s [2] 0.25s [33] 0.33s
+bpm 120 [10] 0.5s [5] 0.25s [2] 0.125s [33] 0.16s
+bpm 180 [10] 0.33s [5] 0.16s [2] 0.08s [33] 0.11s
+...
+
+n = 6000 / bpm (s)
+
+ex) BPM = 120, start offset = 400 HK
+5 H HS H HK H HS ...
+->
+400 HK
+425 H
+450 HS
+475 H
+500 HK
+525 H
+550 HS
+...
