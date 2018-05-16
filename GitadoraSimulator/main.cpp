@@ -140,6 +140,8 @@ boolean exist(char[]);
 void GAME_START(char*);
 int FIND_MP3();
 int FIND_SONG_IMAGE();
+void CONVERT_TEXT(char*, int);
+double add_division_num(int);
 
 void PlayMusic(char *music_name) {
 	char str[256];
@@ -995,6 +997,9 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam)
 	switch (iMessage) {
 	case WM_CREATE:
 	{
+		CONVERT_TEXT(".\\text\\8DE.txt", 300);
+
+
 		#pragma region 곡 정보 불러오기
 		setlocale(LC_ALL, ".OCP");
 		wchar_t count[16], id[16], bpm[16], length[16];
@@ -1358,3 +1363,71 @@ boolean exist(char searchText[])
 	}
 	return false;
 }*/
+
+void CONVERT_TEXT(char *file_name, int offset) {
+	FILE *fr = fopen(file_name, "r");
+	//strtok(file_name, ".txt");
+	//strcat(file_name, "-t.txt");
+	FILE *fw = fopen(".\\text\\output.txt", "w");
+	char ch;
+	char note_str[20];
+	int half_mode = 0;
+	int interval = 0;
+	double timing = offset;
+	const int bpm = 120;
+	const int n = 6000 / bpm;
+	char t[10];
+	int td;
+
+	fscanf(fr, "v3");
+	fscanf(fr, "%s", t);
+	fscanf(fr, "%d-%d-%d", &td, &td, &td);
+	while (fgetc(fr) != '*') {
+		fseek(fr, -1, SEEK_CUR);
+		while ((ch = fgetc(fr)) != '=') {
+			if (ch == '[')			half_mode = 1;
+			else if (ch == ']')		half_mode = 0;
+			else {
+				fseek(fr, -1, SEEK_CUR);
+				fscanf(fr, "%s", note_str);
+
+				timing += ((double)n * add_division_num(interval) / (double)(half_mode + 1));
+				if (!strcmp(note_str, "X"))
+					continue;
+				fprintf(fw, "%d %s\n", (int)timing, note_str);
+			}
+			fseek(fr, +1, SEEK_CUR);
+		}
+		fscanf(fr, "%d", &interval);
+	}
+	fclose(fw);
+	fclose(fr);
+}
+
+double add_division_num(int adn)
+{
+	double a;
+	if (adn % 10 == 0) {
+		a = (double)adn / 10.0;
+	}
+	else {
+		switch (adn) {
+		case 5: a = 0.5; break;
+		case 2: a = 0.25; break;
+		case 7: a = 0.75; break;
+		case 1: a = 0.125; break;
+		case 3: a = 0.375; break;
+		case 6: a = 0.625; break;
+		case 8: a = 0.875; break;
+		case 33: a = 0.3333; break;
+		case 66: a = 0.6666; break;
+		case 16: a = 0.1666; break;
+		case 83: a = 0.8333; break;
+		case 11: a = 0.0625; break;
+		case 12: a = 0.0833; break;
+		case 25: a = 0.2; break;
+		case 17: a = 0.142857; break;
+		}
+	}
+	return a;
+}
