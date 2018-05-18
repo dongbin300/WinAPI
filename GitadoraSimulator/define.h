@@ -10,12 +10,12 @@
 #define GAME_RESOLUTION_WIDTH 1280
 #define GAME_RESOLUTION_HEIGHT 720
 #define TASKBAR_HEIGHT 40
-#define FPS 100
-#define MIN_FRAME_TIME 0.01
-#define MAX_FRAME_TIME 0.02
-#define GEARHEIGHT 565
+#define FPS 60
+#define MIN_FRAME_TIME 0.016666
+#define MAX_FRAME_TIME 0.033333
 #define NOTE_MAX 2000
 #define LINE_MAX 10
+#define SAMETIME_MAX 4
 #define scoreY 100
 #define judgeY 300
 #define NOTE_EFFECT_MAX 10
@@ -27,7 +27,9 @@
 #define GP_RESULT 0x0002
 #pragma endregion
 
-#pragma region Distribution
+#pragma region PLAY SCREEN XY
+#define GEARHEIGHT 567
+#define FALL_ZONE 562
 #define GEAR_DIST0 295
 #define GEAR_LEFT 3
 #define GEAR_XC 71
@@ -49,8 +51,8 @@
 #define GEAR_YM 10
 #define GEAR_YF 40
 #define GEAR_YR 51
-#define JUDGELINE_UP 3
-#define JUDGELINE_DOWN 2
+#define JUDGELINE_UP 5
+#define JUDGELINE_DOWN 5
 #define DRUM_DISPLAY 59
 #define GAUGE_DISPLAY 57
 #define INGAME_JACKET_SIZE 64

@@ -42,9 +42,10 @@ int full_screen = 0; // 풀스크린 체크
 HBITMAP hb, ob;
 
 struct _NOTE {
+	int timing; // 노트 출현 타이밍
+	int num; // 드럼 종류
+	double pos; // 노트의 위치
 	boolean onscr = false; // 노트가 화면에 떠 있는지
-	int time; // 노트 타이밍
-	int num; // 노트키
 }note[NOTE_MAX];
 
 struct _LINE {
@@ -56,14 +57,15 @@ struct _OPTION {
 	struct __HOTKEY {
 		char key[9]; // 단축키
 	}hotkey;
-	float sp; // 스피드(배속)
+	double sp; // 스피드(배속)
 }option;
 
 struct _GAME {
 	struct __NOTE {
-		int note_count = 0; // 지금까지 지나간 노트 수
+		//int note_count = 0; // 지금까지 지나간 노트 수
+		int start = 0; // 검사 시작할 인덱스
 		int cnt = 0; // 노트 인덱스
-		int hitgear[10] = { 0, }; // 노트를 처리한 기어 번호
+		//int hitgear[10] = { 0, }; // 노트를 처리한 기어 번호
 	}note;
 	struct __MUSIC {
 		int id;
@@ -73,20 +75,21 @@ struct _GAME {
 		wchar_t lyric[64] = { 0, }; // 작사가
 		int bpm; // BPM
 		int length; // 길이
-		wchar_t df[4][8]; // Basic, Advanced, Extreme, Master
+		wchar_t df[4][8]; // [0~3], mas, ext, adv, bas
+		int all_note_count[4] = { 0, }; // 총 노트수 [0~3], mas, ext, adv, bas
+		int note_count[4][9] = { 0, }; // 드럼별 노트수 [0~3], mas, ext, adv, bas
 	}music[100];
 	struct __CHOICE {
 		int ptr; // 현재 선택된 노래 인덱스
-		int df_ptr; // 현재 선택된 난이도 (1~4) // mas, ext, adv, bas
+		int df_ptr; // 현재 선택된 난이도 (0~3), mas, ext, adv, bas
 		int music_count; // 노래 총 개수
 	}choice;
 	struct __PLAY {
 		int music_ptr; // 플레이하는 노래
-		int df_ptr; // 플레이하는 난이도
+		int df_ptr; // 플레이하는 난이도 (0~3), mas, ext, adv, bas
 		int perfect, great, good, ok, miss, mc, score; // 퍼펙, 그렛, 굳, 오케, 미스, 맥콤, 스코어
 		double acc; // 달성률
 		double skill; // 스킬
-		int note_count; // 총 노트수
 		int time; // 플레이타임(틱)
 	}play;
 	struct __LINE {
@@ -136,12 +139,8 @@ int digit_num(int, int);
 int round(float);
 int _mod(int, int);
 int EXC_SCORE(int);
-boolean exist(char[]);
-void GAME_START(char*);
 int FIND_MP3();
-int FIND_SONG_IMAGE();
-void CONVERT_TEXT(char*, int);
-double add_division_num(int);
+void ASSIGN_NOTE(FILE*);
 
 void PlayMusic(char *music_name) {
 	char str[256];
@@ -251,22 +250,10 @@ void Display(HWND hWnd)
 	SetBkMode(indc, TRANSPARENT);
 	#pragma endregion
 
-	#pragma region 노트 생성
-	if (game.screen == GP_PLAY) {
-		if (game.beatcnt-- <= 0) { // 마디선 생성은 조금 고민해봐야함
-			game.beatcnt = 8;
-		}
-	}
-	#pragma endregion
-
-	#pragma region 노트&마디선 낙하
-	for (i = 0; i < NOTE_MAX; i++) { // 노트가 떨어지게 함
+	#pragma region 노트 낙하
+	for (i = game.note.start; i <= game.note.cnt; i++) { // 노트가 떨어지게 함
 		if (note[i].onscr)
-			note[i].time -= option.sp;
-	}
-	for (i = 0; i < LINE_MAX; i++) {
-		if (line[i].onscr)
-			line[i].time -= option.sp;
+			note[i].pos -= option.sp * 4;
 	}
 	#pragma endregion
 
@@ -275,9 +262,9 @@ void Display(HWND hWnd)
 	#pragma endregion
 
 	#pragma region 노트 이펙트 타이머
-	for (i = 1; i < 8; i++) {
-		game.note.hitgear[i] = game.note.hitgear[i] > 0 ? game.note.hitgear[i] - 1 : game.note.hitgear[i];
-	}
+	//for (i = 1; i < 8; i++) {
+	//	game.note.hitgear[i] = game.note.hitgear[i] > 0 ? game.note.hitgear[i] - 1 : game.note.hitgear[i];
+	//}
 	#pragma endregion
 
 	#pragma region 콤보 표시 타이머
@@ -325,6 +312,9 @@ void Display(HWND hWnd)
 	#pragma region 곡 선택 화면
 	if (game.screen == GP_CHOICE) // 곡 선택 화면
 	{
+		char Tanc[10];
+		sprintf(Tanc, "%d", game.music[game.choice.ptr].all_note_count[game.choice.df_ptr]);
+		__text(Tanc, 100, 50);
 		/* BG 표시 */
 		__draw(L".\\image\\matixx-1.png", 0, 0, GAME_RESOLUTION_WIDTH, GAME_RESOLUTION_HEIGHT);
 
@@ -401,16 +391,16 @@ void Display(HWND hWnd)
 			SetTextAlign(indc, TA_TOP | TA_LEFT);
 
 			__font(df_font);
-			wsprintfW(Tdf, L"%c.", game.music[game.choice.ptr].df[3 - i][0]);
+			wsprintfW(Tdf, L"%c.", game.music[game.choice.ptr].df[i][0]);
 			__textW(Tdf, 550, 390 + 80 * i);
 
 			__font(df_font2);
-			wsprintfW(Tdf, L"%c%c", game.music[game.choice.ptr].df[3 - i][2], game.music[game.choice.ptr].df[3 - i][3]);
+			wsprintfW(Tdf, L"%c%c", game.music[game.choice.ptr].df[i][2], game.music[game.choice.ptr].df[i][3]);
 			__textW(Tdf, 586, 403 + 80 * i);
 		}
 		__pen(150, 185, 253, 4);
 		__nullbrush;
-		__rect(434, 285 + 80 * game.choice.df_ptr, 646, 368 + 80 * game.choice.df_ptr);
+		__rect(434, 365 + 80 * game.choice.df_ptr, 646, 448 + 80 * game.choice.df_ptr);
 
 
 		/* 곡 정보 표시 */
@@ -445,12 +435,9 @@ void Display(HWND hWnd)
 		__text(Tbpm, 100, 220);
 		__text(Tfps, 100, 240);
 
-		note[0].time = 800;
-		note[0].num = 2;
-		note[1].time = 1000;
-		note[1].num = 3;
-		if (game.play.time == (note[0].time-GEARHEIGHT)) {
-			CREATE_NOTE(note[0].num);
+		// 노트 타이밍에 맞게 생성
+		if (game.play.time >= (int)(note[game.note.cnt].timing - (double)GEARHEIGHT * ((double)1 / option.sp))) {
+			CREATE_NOTE(note[game.note.cnt++].num);
 		}
 
 		#pragma region 키 조명 그리기
@@ -697,7 +684,7 @@ void Display(HWND hWnd)
 		*/
 
 		#pragma region 노트 처리
-		for (i = 0; i < NOTE_MAX; i++)
+		for (i = game.note.start; i <= game.note.cnt; i++)
 		{
 			if (note[i].onscr) { // 노트가 화면에 떠 있으면
 				/*if (note[i].time <= -6 * option.sp) { // 노트를 놓치면 미스 처리
@@ -712,21 +699,25 @@ void Display(HWND hWnd)
 				}
 				else if (note[i].time <= -52) // 노트가 화면 밖으로 나가면 그리지 않음
 				{
-		
+
 				}*/
+				if (note[i].pos <= -20) {
+					note[i].onscr = false;
+					game.note.start++;
+				}
 				#pragma region 노트 그리기
-					switch (note[i].num) {
-					case 1: __draw(L".\\image\\C.png", GEAR_DIST0 + GearX[0], GEARHEIGHT - (note[i].time - game.play.time), GEAR_XC, GEAR_YC); break;
-					case 2: __draw(L".\\image\\H.png", GEAR_DIST0 + GearX[1], GEARHEIGHT - (note[i].time - game.play.time), GEAR_XH, GEAR_YH); break;
-					case 3: __draw(L".\\image\\L.png", GEAR_DIST0 + GearX[2], GEARHEIGHT - (note[i].time - game.play.time), GEAR_XL, GEAR_YL); break;
-					case 4: __draw(L".\\image\\S.png", GEAR_DIST0 + GearX[3], GEARHEIGHT - (note[i].time - game.play.time), GEAR_XS, GEAR_YS); break;
-					case 5: __draw(L".\\image\\T.png", GEAR_DIST0 + GearX[4], GEARHEIGHT - (note[i].time - game.play.time), GEAR_XT, GEAR_YT); break;
-					case 6: __draw(L".\\image\\K.png", GEAR_DIST0 + GearX[5], GEARHEIGHT - (note[i].time - game.play.time), GEAR_XK, GEAR_YK); break;
-					case 7: __draw(L".\\image\\M.png", GEAR_DIST0 + GearX[6], GEARHEIGHT - (note[i].time - game.play.time), GEAR_XM, GEAR_YM); break;
-					case 8: __draw(L".\\image\\F.png", GEAR_DIST0 + GearX[7], GEARHEIGHT - (note[i].time - game.play.time), GEAR_XF, GEAR_YF); break;
-					case 9: __draw(L".\\image\\R.png", GEAR_DIST0 + GearX[8], GEARHEIGHT - (note[i].time - game.play.time), GEAR_XR, GEAR_YR); break;
-					}
-					/*
+				switch (note[i].num) {
+				case 1: __draw(L".\\image\\C.png", GEAR_DIST0 + GearX[0], GEARHEIGHT - note[i].pos, GEAR_XC, GEAR_YC); break;
+				case 2: __draw(L".\\image\\H.png", GEAR_DIST0 + GearX[1], GEARHEIGHT - note[i].pos, GEAR_XH, GEAR_YH); break;
+				case 3: __draw(L".\\image\\L.png", GEAR_DIST0 + GearX[2], GEARHEIGHT - note[i].pos, GEAR_XL, GEAR_YL); break;
+				case 4: __draw(L".\\image\\S.png", GEAR_DIST0 + GearX[3], GEARHEIGHT - note[i].pos, GEAR_XS, GEAR_YS); break;
+				case 5: __draw(L".\\image\\T.png", GEAR_DIST0 + GearX[4], GEARHEIGHT - note[i].pos, GEAR_XT, GEAR_YT); break;
+				case 6: __draw(L".\\image\\K.png", GEAR_DIST0 + GearX[5], GEARHEIGHT - note[i].pos, GEAR_XK, GEAR_YK); break;
+				case 7: __draw(L".\\image\\M.png", GEAR_DIST0 + GearX[6], GEARHEIGHT - note[i].pos, GEAR_XM, GEAR_YM); break;
+				case 8: __draw(L".\\image\\F.png", GEAR_DIST0 + GearX[7], GEARHEIGHT - note[i].pos, GEAR_XF, GEAR_YF); break;
+				case 9: __draw(L".\\image\\R.png", GEAR_DIST0 + GearX[8], GEARHEIGHT - note[i].pos, GEAR_XR, GEAR_YR); break;
+				}
+				/*
 			#pragma region 직사각형 그래픽 노트
 			else if (option.dp == 2) {
 			brush = (HBRUSH)GetStockObject(DC_BRUSH);
@@ -836,7 +827,7 @@ void Display(HWND hWnd)
 		__brush(143, 145, 142);
 		__rect(449, 539, 819, 612);
 		DeleteObject(SelectObject(indc, obrush));
-		brush = CreateSolidBrush(df_color[game.play.df_ptr - 1]);
+		brush = CreateSolidBrush(df_color[game.play.df_ptr]);
 		obrush = (HBRUSH)SelectObject(indc, brush);
 		__rect(658, 632, 819, 655);
 		__font(title_font);
@@ -850,7 +841,7 @@ void Display(HWND hWnd)
 		__text("DRUM", 662, 654);
 		SetTextAlign(indc, TA_BOTTOM | TA_RIGHT);
 		__font(df_dis_font);
-		__text(Tdf_dis[game.play.df_ptr - 1], 815, 655);
+		__text(Tdf_dis[game.play.df_ptr], 815, 655);
 		SetTextAlign(indc, TA_TOP | TA_LEFT);
 
 		/* 난이도, 달성률, 스킬 표시 */
@@ -868,14 +859,14 @@ void Display(HWND hWnd)
 
 		/* 난이도 표시 */
 		__font(r_df_font);
-		sprintf(Temp, "%c.", game.music[game.play.music_ptr].df[4 - game.play.df_ptr][0]);
+		sprintf(Temp, "%c.", game.music[game.play.music_ptr].df[game.play.df_ptr][0]);
 		__text(Temp, 1081, 160);
 		__font(r_df_font2);
-		sprintf(Temp, "%c%c", game.music[game.play.music_ptr].df[4 - game.play.df_ptr][2], game.music[game.play.music_ptr].df[4 - game.play.df_ptr][3]);
+		sprintf(Temp, "%c%c", game.music[game.play.music_ptr].df[game.play.df_ptr][2], game.music[game.play.music_ptr].df[game.play.df_ptr][3]);
 		__text(Temp, 1125, 168);
 
 		/* 달성률 표시 */
-		game.play.acc = (double)(game.play.perfect * 90 + game.play.great * 40 + game.play.mc * 10) / (double)game.play.note_count; // 달성률 = P*90+G*40+MC*10 / 총 노트수
+		game.play.acc = (double)(game.play.perfect * 90 + game.play.great * 40 + game.play.mc * 10) / (double)game.music[game.play.music_ptr].all_note_count[game.play.df_ptr]; // 달성률 = P*90+G*40+MC*10 / 총 노트수
 		gcvt(game.play.acc, 4, Tacc);
 		__font(r_acc_font);
 		sprintf(Temp, "%c%c.", Tacc[0], Tacc[1]);
@@ -885,7 +876,7 @@ void Display(HWND hWnd)
 		__text(Temp, 1120, 240);
 
 		/* 스킬 표시 */
-		game.play.skill = wcstod(game.music[game.play.music_ptr].df[4 - game.play.df_ptr], NULL) * game.play.acc / 5.0; // 스킬 = 난이도 * 달성률/5
+		game.play.skill = wcstod(game.music[game.play.music_ptr].df[game.play.df_ptr], NULL) * game.play.acc / 5.0; // 스킬 = 난이도 * 달성률/5
 		gcvt(game.play.skill, 5, Tskill);
 		__font(r_skill_font);
 		sprintf(Temp, "%c%c%c.", Tskill[0], Tskill[1], Tskill[2]);
@@ -895,7 +886,7 @@ void Display(HWND hWnd)
 		__text(Temp, 1129, 353);
 
 		/* 스코어 계산 */
-		game.play.score = (int)((double)27384632 / (double)EXC_SCORE(game.play.note_count) * 1000000.0); // 스코어 = 가점 / EXC점 * 1,000,000
+		game.play.score = (int)((double)27384632 / (double)EXC_SCORE(game.music[game.play.music_ptr].all_note_count[game.play.df_ptr]) * 1000000.0); // 스코어 = 가점 / EXC점 * 1,000,000
 
 																										 /* 판정, 스코어 표시 */
 		char judgetext[][12] = { "Perfect", "Great", "Good", "Ok", "Miss", "MaxCombo", "Score" };
@@ -912,12 +903,12 @@ void Display(HWND hWnd)
 		sprintf(Temp, "%d", game.play.miss);			__text(Temp, 1034, 579);
 		sprintf(Temp, "%d", game.play.mc);				__text(Temp, 1034, 603);
 		sprintf(Temp, "%d", game.play.score);			__text(Temp, 1070, 627);
-		sprintf(Temp, "%d", (int)((double)game.play.perfect / (double)game.play.note_count * 100.0));	__text(Temp, 1094, 483);
-		sprintf(Temp, "%d", (int)((double)game.play.great / (double)game.play.note_count * 100.0));		__text(Temp, 1094, 507);
-		sprintf(Temp, "%d", (int)((double)game.play.good / (double)game.play.note_count * 100.0));		__text(Temp, 1094, 531);
-		sprintf(Temp, "%d", (int)((double)game.play.ok / (double)game.play.note_count * 100.0));		__text(Temp, 1094, 555);
-		sprintf(Temp, "%d", (int)((double)game.play.miss / (double)game.play.note_count * 100.0));		__text(Temp, 1094, 579);
-		sprintf(Temp, "%d", (int)((double)game.play.mc / (double)game.play.note_count * 100.0));		__text(Temp, 1094, 603);
+		sprintf(Temp, "%d", (int)((double)game.play.perfect / (double)game.music[game.play.music_ptr].all_note_count[game.play.df_ptr] * 100.0));	__text(Temp, 1094, 483);
+		sprintf(Temp, "%d", (int)((double)game.play.great / (double)game.music[game.play.music_ptr].all_note_count[game.play.df_ptr] * 100.0));		__text(Temp, 1094, 507);
+		sprintf(Temp, "%d", (int)((double)game.play.good / (double)game.music[game.play.music_ptr].all_note_count[game.play.df_ptr] * 100.0));		__text(Temp, 1094, 531);
+		sprintf(Temp, "%d", (int)((double)game.play.ok / (double)game.music[game.play.music_ptr].all_note_count[game.play.df_ptr] * 100.0));		__text(Temp, 1094, 555);
+		sprintf(Temp, "%d", (int)((double)game.play.miss / (double)game.music[game.play.music_ptr].all_note_count[game.play.df_ptr] * 100.0));		__text(Temp, 1094, 579);
+		sprintf(Temp, "%d", (int)((double)game.play.mc / (double)game.music[game.play.music_ptr].all_note_count[game.play.df_ptr] * 100.0));		__text(Temp, 1094, 603);
 		SetTextAlign(indc, TA_TOP | TA_LEFT);
 		for (i = 0; i < 6; i++) {
 			__text("％", 1093, 485 + 24 * i);
@@ -997,9 +988,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam)
 	switch (iMessage) {
 	case WM_CREATE:
 	{
-		CONVERT_TEXT(".\\text\\8DE.txt", 300);
-
-
 		#pragma region 곡 정보 불러오기
 		setlocale(LC_ALL, ".OCP");
 		wchar_t count[16], id[16], bpm[16], length[16];
@@ -1013,7 +1001,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam)
 			fwscanf(fr, L"%s", id);
 			fwscanf(fr, L"%s%s%s%s", game.music[i].title, game.music[i].artist, game.music[i].comp, game.music[i].lyric);
 			fwscanf(fr, L"%s%s", bpm, length);
-			fwscanf(fr, L"%s%s%s%s", game.music[i].df[0], game.music[i].df[1], game.music[i].df[2], game.music[i].df[3]);
+			fwscanf(fr, L"%s%s%s%s", game.music[i].df[3], game.music[i].df[2], game.music[i].df[1], game.music[i].df[0]);
 
 			game.music[i].id = _wtoi(id);
 			game.music[i].bpm = _wtoi(bpm);
@@ -1038,26 +1026,14 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam)
 		fclose(fr);
 		#pragma endregion
 
-		#pragma region Frame
-		SetTimer(hWnd, 1, 1000 / FPS, NULL);
+		#pragma region 채보 노트수 불러오기
+		
 		#pragma endregion
 
 		game.screen = GP_CHOICE;
-		me.score = 520498;
-		option.sp = 4.5;
-		me.gauge = 100;
-		game.choice.ptr = 33;
-		game.choice.df_ptr = 1;
-		game.play.music_ptr = 32;
-		game.play.df_ptr = 1;
-		game.play.perfect = 848;
-		game.play.great = 27;
-		game.play.good = 4;
-		game.play.ok = 0;
-		game.play.miss = 2;
-		game.play.mc = 749;
-		game.play.note_count = 881;
-		game.play.score = 936094;
+		option.sp = 4.0;
+		game.choice.ptr = 38;
+		game.choice.df_ptr = 0;
 	}
 	break;
 	case WM_TIMER:
@@ -1088,10 +1064,10 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam)
 			game.choice.ptr = game.choice.ptr >= game.choice.music_count - 1 ? 0 : game.choice.ptr + 1;
 			break;
 		case VK_LEFT:
-			game.choice.df_ptr = game.choice.df_ptr <= 1 ? 4 : game.choice.df_ptr - 1;
+			game.choice.df_ptr = game.choice.df_ptr <= 0 ? 3 : game.choice.df_ptr - 1;
 			break;
 		case VK_RIGHT:
-			game.choice.df_ptr = game.choice.df_ptr >= 4 ? 1 : game.choice.df_ptr + 1;
+			game.choice.df_ptr = game.choice.df_ptr >= 3 ? 0 : game.choice.df_ptr + 1;
 			break;
 		case 0x0D: // Enter
 			if (game.screen == GP_CHOICE) { // 노래 선택
@@ -1099,6 +1075,32 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam)
 				game.play.music_ptr = game.choice.ptr;
 				game.play.df_ptr = game.choice.df_ptr;
 				game.play.perfect = game.play.great = game.play.good = game.play.ok = game.play.miss = game.play.mc = game.play.score = 0;
+				char src[64];
+				FILE *fr;
+				if (game.choice.df_ptr == 0) {
+					sprintf(src, ".\\text\\%dDM-t.txt", game.music[game.choice.ptr].id);
+					fr = fopen(src, "r");
+					if (fr) {
+						ASSIGN_NOTE(fr);
+						fclose(fr);
+					}
+				}
+				else if(game.choice.df_ptr==1) {
+					sprintf(src, ".\\text\\%dDE-t.txt", game.music[game.choice.ptr].id);
+					fr = fopen(src, "r");
+					if (fr) {
+						ASSIGN_NOTE(fr);
+						fclose(fr);
+					}
+				}
+				game.play.time = 0;
+				game.note.start = 0;
+				game.note.cnt = 0;
+				me.score = 0;
+				me.gauge = 80;
+				for (int i = 0; i < NOTE_MAX; i++)
+					note[i].onscr = false;
+				//음악 재생
 			}
 			/*GetWindowRect(hWnd, &rect);
 			if (full_screen) {
@@ -1161,7 +1163,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam)
 		#pragma endregion
 
 		PostQuitMessage(0);
-		KillTimer(hWnd, 1);
 	}
 	break;
 	}
@@ -1182,14 +1183,14 @@ void judgment(int n)
 	{
 		if (note[mnn].num == n)
 		{
-			if (note[mnn].time >= -(1.7*judgment_ratio) && note[mnn].time <= (1.7*judgment_ratio)) // 퍼펙트 처리
+			if (note[mnn].timing >= -(1.7*judgment_ratio) && note[mnn].timing <= (1.7*judgment_ratio)) // 퍼펙트 처리
 			{
 				//PlaySound(".\\sound\\hit1.wav", NULL, SND_ASYNC);
 				Ptext = 1;
 				Gtext = 0;
 				Btext = 0;
 				Mtext = 0;
-				game.note.note_count++;
+				//game.note.note_count++;
 				me.perfect++;
 				me.combo++;
 				me.score += obt_score;
@@ -1197,16 +1198,16 @@ void judgment(int n)
 				if (me.combo > me.mc)
 					me.mc = me.combo;
 				//game.combo_timer = 8;
-				game.note.hitgear[n] = NOTE_EFFECT_MAX * 2; // 히트 이펙트 표시용
+				//game.note.hitgear[n] = NOTE_EFFECT_MAX * 2; // 히트 이펙트 표시용
 			}
-			else if (note[mnn].time >= -(4 * judgment_ratio) && note[mnn].time <= (4 * judgment_ratio)) // 그레이트 처리
+			else if (note[mnn].timing >= -(4 * judgment_ratio) && note[mnn].timing <= (4 * judgment_ratio)) // 그레이트 처리
 			{
 				//PlaySound(".\\sound\\hit1.wav", NULL, SND_ASYNC);
 				Ptext = 0;
 				Gtext = 1;
 				Btext = 0;
 				Mtext = 0;
-				game.note.note_count++;
+				//game.note.note_count++;
 				me.great++;
 				me.combo++;
 				me.score += obt_score * 0.5;
@@ -1214,16 +1215,16 @@ void judgment(int n)
 				if (me.combo > me.mc)
 					me.mc = me.combo;
 				//game.combo_timer = 8;
-				game.note.hitgear[n] = NOTE_EFFECT_MAX * 2; // 히트 이펙트 표시용
+				//game.note.hitgear[n] = NOTE_EFFECT_MAX * 2; // 히트 이펙트 표시용
 			}
-			else if (note[mnn].time >= -(6 * judgment_ratio) && note[mnn].time <= (6 * judgment_ratio)) // 배드 처리
+			else if (note[mnn].timing >= -(6 * judgment_ratio) && note[mnn].timing <= (6 * judgment_ratio)) // 배드 처리
 			{
 				//PlaySound(".\\sound\\hit1.wav", NULL, SND_ASYNC);
 				Ptext = 0;
 				Gtext = 0;
 				Btext = 1;
 				Mtext = 0;
-				game.note.note_count++;
+				//game.note.note_count++;
 				me.bad++;
 				me.combo = 0;
 				me.score += obt_score * 0.25;
@@ -1242,8 +1243,8 @@ int MOST_NEAR_NOTE(int n)
 	for (int i = 0; i < NOTE_MAX; i++) {
 		if (note[i].onscr) {
 			if (note[i].num == n) {
-				if (note[i].time < min) {
-					min = note[i].time;
+				if (note[i].timing < min) {
+					min = note[i].timing;
 					min_index = i;
 				}
 			}
@@ -1258,34 +1259,19 @@ int MOST_NEAR_NOTE(int n)
 
 void CREATE_NOTE(int n)
 {
-	note[game.note.cnt%NOTE_MAX].num = n;
-	note[game.note.cnt%NOTE_MAX].onscr = true;
+	note[game.note.cnt].pos = GEARHEIGHT;
+	note[game.note.cnt].num = n;
+	note[game.note.cnt].onscr = true;
 	game.note.cnt++;
 }
 
 void CREATE_LINE()
 {
-	line[game.line.cnt%LINE_MAX].time = GEARHEIGHT;
-	line[game.line.cnt%LINE_MAX].onscr = true;
+	line[game.line.cnt].time = GEARHEIGHT;
+	line[game.line.cnt].onscr = true;
 	game.line.cnt++;
 }
 
-void GAME_START(char *music_name)
-{
-	/* 값 초기화 */
-	game.screen = GP_PLAY;
-	game.play.time = 0;
-	game.note.cnt = 0;
-	game.note.note_count = 0;
-	for (int i = 0; i < NOTE_MAX; i++)
-		note[i].onscr = false;
-	Ptext = Gtext = Btext = Mtext = 0;
-	me.perfect = me.great = me.bad = me.miss = me.score = me.combo = me.mc = 0;
-
-	char music_dir[256] = ".\\music\\";
-	strcat(music_dir, music_name);
-	PlayMusic(music_dir);
-}
 /*
 int FIND_MP3()
 {
@@ -1300,26 +1286,6 @@ int FIND_MP3()
 	while (bResult) {
 		wsprintf(temp, "%s", wfd.cFileName);
 		strcpy(game.music.choice.music_title[idx++], strtok(temp, ".")); // 확장자는 떼고 저장
-		bResult = FindNextFile(hSrch, &wfd);
-	}
-	FindClose(hSrch);
-
-	return idx;
-}
-
-int FIND_SONG_IMAGE()
-{
-	HANDLE hSrch;
-	WIN32_FIND_DATA wfd;
-	BOOL bResult = TRUE;
-	int idx = 0;
-	char temp[256];
-
-	hSrch = FindFirstFile(".\\song_image\\*.jpg", &wfd);
-	if (hSrch == INVALID_HANDLE_VALUE)	return -1;
-	while (bResult) {
-		wsprintf(temp, "%s", wfd.cFileName);
-		strcpy(game.music.choice.song_image[idx++], strtok(temp, ".")); // 확장자는 떼고 저장
 		bResult = FindNextFile(hSrch, &wfd);
 	}
 	FindClose(hSrch);
@@ -1354,80 +1320,28 @@ int EXC_SCORE(int note_count) {
 	return (50 * note_count * (note_count + 1));
 }
 
-/*
-boolean exist(char searchText[])
-{
-	for (int i = 0; i < 1024; i++) {
-		if (!strcmp(game.music.choice.song_image[i], searchText))
-			return true;
-	}
-	return false;
-}*/
+void ASSIGN_NOTE(FILE *fr) {
+	int timing;
+	char note_str[10];
+	int ptr = 0;
 
-void CONVERT_TEXT(char *file_name, int offset) {
-	FILE *fr = fopen(file_name, "r");
-	//strtok(file_name, ".txt");
-	//strcat(file_name, "-t.txt");
-	FILE *fw = fopen(".\\text\\output.txt", "w");
-	char ch;
-	char note_str[20];
-	int half_mode = 0;
-	int interval = 0;
-	double timing = offset;
-	const int bpm = 120;
-	const int n = 6000 / bpm;
-	char t[10];
-	int td;
-
-	fscanf(fr, "v3");
-	fscanf(fr, "%s", t);
-	fscanf(fr, "%d-%d-%d", &td, &td, &td);
-	while (fgetc(fr) != '*') {
-		fseek(fr, -1, SEEK_CUR);
-		while ((ch = fgetc(fr)) != '=') {
-			if (ch == '[')			half_mode = 1;
-			else if (ch == ']')		half_mode = 0;
-			else {
-				fseek(fr, -1, SEEK_CUR);
-				fscanf(fr, "%s", note_str);
-
-				timing += ((double)n * add_division_num(interval) / (double)(half_mode + 1));
-				if (!strcmp(note_str, "X"))
-					continue;
-				fprintf(fw, "%d %s\n", (int)timing, note_str);
+	while (!feof(fr)) {
+		fscanf(fr, "%d %s\n", &timing, note_str);
+		for (int i = 0; i < strlen(note_str); i++) {
+			note[ptr].timing = timing;
+			switch (note_str[i]) {
+			case 'C': note[ptr].num = 1; break;
+			case 'H': note[ptr].num = 2; break;
+			case 'L': note[ptr].num = 3; break;
+			case 'S': note[ptr].num = 4; break;
+			case 'T': note[ptr].num = 5; break;
+			case 'K': note[ptr].num = 6; break;
+			case 'M': note[ptr].num = 7; break;
+			case 'F': note[ptr].num = 8; break;
+			case 'R': note[ptr].num = 9; break;
+			case 'X': ptr--; break;
 			}
-			fseek(fr, +1, SEEK_CUR);
-		}
-		fscanf(fr, "%d", &interval);
-	}
-	fclose(fw);
-	fclose(fr);
-}
-
-double add_division_num(int adn)
-{
-	double a;
-	if (adn % 10 == 0) {
-		a = (double)adn / 10.0;
-	}
-	else {
-		switch (adn) {
-		case 5: a = 0.5; break;
-		case 2: a = 0.25; break;
-		case 7: a = 0.75; break;
-		case 1: a = 0.125; break;
-		case 3: a = 0.375; break;
-		case 6: a = 0.625; break;
-		case 8: a = 0.875; break;
-		case 33: a = 0.3333; break;
-		case 66: a = 0.6666; break;
-		case 16: a = 0.1666; break;
-		case 83: a = 0.8333; break;
-		case 11: a = 0.0625; break;
-		case 12: a = 0.0833; break;
-		case 25: a = 0.2; break;
-		case 17: a = 0.142857; break;
+			ptr++;
 		}
 	}
-	return a;
 }
