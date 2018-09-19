@@ -1,0 +1,6 @@
+﻿  main.cpp
+c:\users\kyoumei\documents\visual studio 2015\projects\dpst_eve\dpst_eve\main.cpp(141): warning C4101: 'i' :참조되지 않은 지역 변수입니다.
+c:\users\kyoumei\documents\visual studio 2015\projects\dpst_eve\dpst_eve\main.cpp(140): warning C4101: 'fr' :참조되지 않은 지역 변수입니다.
+c:\users\kyoumei\documents\visual studio 2015\projects\dpst_eve\dpst_eve\main.cpp(140): warning C4101: 'fw' :참조되지 않은 지역 변수입니다.
+  DPST_EVE.vcxproj -> C:\Users\Kyoumei\documents\visual studio 2015\Projects\DPST_EVE\Debug\DPST_EVE.exe
+  DPST_EVE.vcxproj -> C:\Users\Kyoumei\documents\visual studio 2015\Projects\DPST_EVE\Debug\DPST_EVE.pdb (Full PDB)
